@@ -2,12 +2,38 @@
 import time
 import json
 import hashlib
+import uuid
+from random import randint
 
 
-toy_chain = []
-tx_pool = []
-nodes = []
-pvt_key = ""
+class ToyChain:
+    def __init__(self, pvt_key=None):
+        self.tx_pool = []
+        self.nodes = []
+        self.pvt_key = pvt_key or str(uuid.uuid4()).replace('-', '')
+        self.pub_key = "asd"  # TODO generate pub key from pvt key
+        self.chain = self._get_chain_from_node()
+
+    def _get_chain_from_node(self):
+        for ip in self.nodes:
+            try:
+                r = requests.get("http://{}/get_last_block".format(ip), timeout=5)
+                if r.status_code == 200:
+                    data = r.json()
+                    self.chain = data["chain"]
+                    break
+            except requests.exceptions.ConnectTimeout as e:
+                print(e)
+            except requests.exceptions.ConnectionError as e:
+                print(e)
+            except requests.exceptions.ReadTimeout as e:
+                print(e)
+            # TODO registe this node to other nodes
+        else:
+            # Create the genesis block
+            print("mining first block")
+            block = genesis_block(self.pub_key)
+            return [block]
 
 
 def hash(inp):
@@ -66,21 +92,40 @@ def post_node(node):
     return post_data("node", node)
 
 
-def new_block():
+def genesis_block(pub_key):
     header = {
-        'index': len(toychain) + 1,
-        'timestamp': time(),
-        'previous_hash': previous_hash or hash(self.chain[-1]),
+        "idx": 1,
+        "ts": time.time(),
+        "prev_hash": "",
     }
-    coinbase_tx = new_tx("", self.pub_key, 50)
-    txs = [coinbase_tx] + self.tx_pool
-    # Reset the current list of transactions
-    tx_pool = []
+    coinbase_tx = new_tx("0", pub_key, 50)
+    txs = [coinbase_tx]
 
     block = dict(header)
-    nonce = get_nonce(header, settings.target)
-    block['nonce'] = nonce
-    block['tx'] = txs
+    target = "1000000000000000000000000000000000000000000000000000000000000000"
+    nonce = get_nonce(header, target)  # use default target
+    block["nonce"] = nonce
+    block["tx"] = txs
+    block["hash"] = ""  # TODO caculate block hash
+    return block
+
+
+def new_block(toychain):
+    header = {
+        "idx": len(toychain.chain) + 1,
+        "ts": time.time(),
+        "prev_hash": toychain.chain[-1]["hash"],
+    }
+    coinbase_tx = new_tx("0", toychain.pub_key, 50)
+    txs = [coinbase_tx] + toychain.tx_pool
+    # Reset the current list of transactions
+    toychain.tx_pool = []
+
+    block = dict(header)
+    nonce = get_nonce(header, toychain.target)
+    block["nonce"] = nonce
+    block["tx"] = txs
+    block["hash"] = ""  # TODO caculate block hash
 
 
 def new_tx(sender, recipient, amount):

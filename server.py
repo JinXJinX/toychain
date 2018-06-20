@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request
 import toychain
 
 app = Flask(__name__)
+tc = toychain.ToyChain()
 
 
 @app.route('/add_node', methods=['POST'])
@@ -44,7 +45,10 @@ def get_last_block():
     """
     Get the lastest block in the chain
     """
-    pass
+    response = {
+        "block": tc.chain[-1]
+    }
+    return jsonify(response), 200
 
 
 @app.route('/get_node', methods=['GET'])
