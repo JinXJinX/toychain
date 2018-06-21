@@ -3,9 +3,15 @@ import json
 
 from flask import Flask, jsonify, request
 import toychain
+from miner import Miner
+import config
 
 app = Flask(__name__)
 tc = toychain.ToyChain()
+miner = Miner(tc)
+
+if config.MINING:
+    miner.start()
 
 
 @app.route('/add_node', methods=['POST'])
@@ -32,12 +38,18 @@ def add_block():
     pass
 
 
-@app.route('/get_block', methods=['GET'])
-def get_block():
+@app.route('/get_block/<int:height>', methods=['GET'])
+def get_block(height):
     """
     Get block by height/idx
     """
-    pass
+    if height > len(tc.chain):
+        return jsonify({'ok': False}), 200
+    response = {
+        "ok": True,
+        "block": tc.chain[height-1]
+    }
+    return jsonify(response), 200
 
 
 @app.route('/get_last_block', methods=['GET'])
@@ -46,6 +58,7 @@ def get_last_block():
     Get the lastest block in the chain
     """
     response = {
+        "ok": True,
         "block": tc.chain[-1]
     }
     return jsonify(response), 200
@@ -57,3 +70,11 @@ def get_node():
     Get a list of registered nodes
     """
     pass
+
+
+@app.route('/ping', methods=['GET'])
+def ping():
+    """
+    ping
+    """
+    return jsonify({'ok': True}), 200
