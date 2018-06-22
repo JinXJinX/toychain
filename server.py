@@ -1,5 +1,7 @@
 # coding=utf-8
 import json
+from urllib.parse import urlparse
+
 
 from flask import Flask, jsonify, request
 import toychain
@@ -19,7 +21,13 @@ def add_node():
     """
     Receive new node, add it to register node list, and broadcast it
     """
-    pass
+    ip = request.remote_addr
+    port = request.environ.get('REMOTE_PORT')
+    if ip not in tc.nodes:
+        # TODO broadcast to other node
+        tc.nodes.append(f'{ip}:{port}')
+        return jsonify({'ok': True}), 200
+    return jsonify({'ok': False}), 200
 
 
 @app.route('/add_tx', methods=['POST'])
@@ -27,6 +35,8 @@ def add_tx():
     """
     Receive new tx, verify it then broadcast it
     """
+    data = request.get_json()
+    tx = json.loads(data.get('tx'))
     pass
 
 
@@ -35,6 +45,8 @@ def add_block():
     """
     Receive new block, verify it then add it to chain and broadcast it
     """
+    data = request.get_json()
+    tx = json.loads(data.get('block'))
     pass
 
 
@@ -69,7 +81,11 @@ def get_node():
     """
     Get a list of registered nodes
     """
-    pass
+    response = {
+        "ok": True,
+        "nodes": tc.nodes
+    }
+    return jsonify(response), 200
 
 
 @app.route('/ping', methods=['GET'])

@@ -15,16 +15,27 @@ class ToyChain:
         self.nodes = get_nodes()
         self.pvt_key = pvt_key or str(uuid.uuid4()).replace('-', '')
         self.pub_key = 'asd'  # TODO generate pub key from pvt key
-        self.chain = self._get_chain_from_node()
+        self.chain = get_chain_from_node(self.nodes, self.pub_key)
+        print(self.nodes)
 
-    def _get_chain_from_node(self):
-        if self.nodes:
-            return get_chain(self.nodes[0])
-        else:
-            # Create the genesis block
-            print('mining first block')
-            block = genesis_block(self.pub_key)
-            return [block]
+    def new_block(self):
+        chain = self.chain
+        header = {
+            'idx': len(chain) + 1,
+            'ts': time.time(),
+            'prev_hash': chain[-1]['hash'],
+        }
+        coinbase_tx = new_tx('0', self.pub_key, 50)
+        txs = [coinbase_tx] + self.tx_pool
+        # Reset the current list of transactions
+        self.tx_pool = []
+
+        block = dict(header)
+        nonce = get_nonce(header, config.TARGET)
+        block['nonce'] = nonce
+        block['tx'] = txs
+        block['hash'] = ''  # TODO caculate block hash
+        chain.append(block)
 
 
 def hash(inp):
@@ -63,41 +74,77 @@ def _get(**kwargs):
     return False, None
 
 
-def _post(**kwwargs):
-    pass
+def _post(**kwargs):
+    try:
+        r = requests.post(**kwargs, timeout=5)
+        if r.status_code == 200:
+            return True, r.json()
+    except requests.exceptions.ConnectTimeout as e:
+        print(e)
+    except requests.exceptions.ConnectionError as e:
+        print(e)
+    except requests.exceptions.ReadTimeout as e:
+        print(e)
+    return False, None
 
 
-def get_chain(node):
-    chain = []
-    height = 1
-    while True:
-        ret, data = _get(url=f'http://{node}/get_block/{height}')
-        if ret and data['ok']:
-            chain.append(data['block'])
-            height += 1
-        else:
-            break
-    return chain
+def get_chain_from_node(nodes, pub_key):
+    if nodes:
+        chain = []
+        height = 1
+        node = nodes[0]
+        while True:
+            ret, data = _get(url=f'http://{node}/get_block/{height}')
+            if ret and data['ok']:
+                chain.append(data['block'])
+                height += 1
+            else:
+                break
+        if chain:
+            return chain
+
+    # Create the genesis block
+    print('mining first block')
+    block = genesis_block(pub_key)
+    return [block]
 
 
 def get_nodes():
     nodes = set()
     for node in config.DEFAULT_NODES:
-        ret, _ = _get(url=f'http://{node}/ping')
-        if ret:
+        ret, data = _post(url=f'http://{node}/add_node')
+        if ret and data['ok']:
             nodes.add(node)
     return list(nodes)
 
 
-def verify_chain():
+def verify_chain(chain):
+    """
+    Check required fields, and caculate whole chain from height 1
+
+    :param chain: list of block data
+    :return: bool
+    """
     pass
 
 
-def verify_tx():
+def verify_tx(tx):
+    """
+    Check required fields, and verify account money and signature
+
+    :param tx: dict, tx data
+    :return: bool
+    """
     pass
 
 
-def verify_block():
+def verify_block(block):
+    """
+    Check required fields, and verify hash, nonce, and target
+
+    :param block: dict, block data
+    :return: bool
+    """
     pass
 
 
@@ -105,25 +152,26 @@ def resolve_conflicts():
     pass
 
 
-def post_data(type, data):
+def post_data(nodes, type, data):
+    """
+    Broadcast data to nodes
+
+    :param nodes: list of nodes
+    :param type: str, 'tx', 'block', or 'node'
+    :param data: a dict, depends on type,
+    """
     postfix = f'/add_{type}'
     for node in nodes:
         r = requests.post(url, data)
 
 
-def post_tx(tx):
-    return post_data('tx', tx)
-
-
-def post_block(block):
-    return post_data('block', block)
-
-
-def post_node(node):
-    return post_data('node', node)
-
-
 def genesis_block(pub_key):
+    """
+    Generate genesis block
+
+    :param pub_key: a address to receive coinbase reward
+    :return: a dict of genesis block data
+    """
     header = {
         'idx': 1,
         'ts': time.time(),
@@ -139,25 +187,6 @@ def genesis_block(pub_key):
     block['tx'] = txs
     block['hash'] = ''  # TODO caculate block hash
     return block
-
-
-def new_block(toychain):
-    header = {
-        'idx': len(toychain.chain) + 1,
-        'ts': time.time(),
-        'prev_hash': toychain.chain[-1]['hash'],
-    }
-    coinbase_tx = new_tx('0', toychain.pub_key, 50)
-    txs = [coinbase_tx] + toychain.tx_pool
-    # Reset the current list of transactions
-    toychain.tx_pool = []
-
-    block = dict(header)
-    nonce = get_nonce(header, config.TARGET)
-    block['nonce'] = nonce
-    block['tx'] = txs
-    block['hash'] = ''  # TODO caculate block hash
-    toychain.chain.append(block)
 
 
 def new_tx(sender, recipient, amount):
