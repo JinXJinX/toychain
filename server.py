@@ -47,6 +47,7 @@ def add_block():
     """
     data = request.get_json()
     tx = json.loads(data.get('block'))
+    # TODO if mining, stop the mining thread
     pass
 
 
@@ -55,11 +56,11 @@ def get_block(height):
     """
     Get block by height/idx
     """
-    if height > len(tc.chain):
+    if height >= len(tc.chain):
         return jsonify({'ok': False}), 200
     response = {
         "ok": True,
-        "block": tc.chain[height-1]
+        "block": tc.chain[height]
     }
     return jsonify(response), 200
 

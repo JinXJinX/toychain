@@ -1,121 +1,100 @@
 # coding=utf-8
 import time
-import json
-import hashlib
-import uuid
-from random import randint
 
 import requests
 import config
+import utils
 
 
 class ToyChain:
-    def __init__(self, pvt_key=None):
+    def __init__(self, pvt_key=None, version=config.VERSION):
+        # TODO use private variables
         self.tx_pool = []
-        self.nodes = get_nodes()
-        self.pvt_key = pvt_key or str(uuid.uuid4()).replace('-', '')
-        self.pub_key = 'asd'  # TODO generate pub key from pvt key
-        self.chain = get_chain_from_node(self.nodes, self.pub_key)
-        print(self.nodes)
+        self.version = version
+        self.nodes = utils.get_nodes()
+
+        self.pvt_key = pvt_key or utils.new_pvt_key()
+        self.pub_key = utils.pvt_2_pub_key(self.pvt_key)
+        self.address = utils.pub_2_address(self.pub_key)
+
+        self.get_chain()
 
     def new_block(self):
         chain = self.chain
         header = {
-            'idx': len(chain) + 1,
+            'version': self.version,
             'ts': time.time(),
-            'prev_hash': chain[-1]['hash'],
+            'prev_hash': '' if not chain else chain[-1]['hash'],
+            'nonce': '0',
+            'target': self.get_target(),
+            # TODO merkle root
         }
+        # TODO does the coinbase tx affects merkle root?
+        # TODO lock thead
         coinbase_tx = new_tx('0', self.pub_key, 50)
         txs = [coinbase_tx] + self.tx_pool
         # Reset the current list of transactions
         self.tx_pool = []
+        # TODO unlock thead
 
         block = dict(header)
-        nonce = get_nonce(header, config.TARGET)
+        nonce = utils.get_nonce(header)
         block['nonce'] = nonce
+        block['hash'] = utils.hash(block)
         block['tx'] = txs
-        block['hash'] = ''  # TODO caculate block hash
         chain.append(block)
 
+    def new_tx(self, to_address, amount, fee, signature):
+        tx = {
+            'from': self.address,
+            'to': to_address,
+            'total_input': amount + fee,
+            'total_output': amount,
+            'signature': self._get_signature(),
+            'ts': time.time(),
+        }
+        tx['hash'] = utils.hash(tx)
+        # TODO verify tx
+        tx['confirmation'] = 1
+        return tx
 
-def hash(inp):
+    def _get_signature(self):
+        pass
+
+    def get_target(self):
+        # TODO adjust target based on previous blocks' mining time
+        return config.TARGET
+
+    def get_chain(self):
+        if self.nodes:
+            chain = []
+            height = 0
+            node = self.nodes[0]
+            while True:
+                ret, data = _get(url=f'http://{node}/get_block/{height}')
+                if ret and data['ok']:
+                    chain.append(data['block'])
+                    height += 1
+                else:
+                    break
+            if chain:
+                self.chain = chain
+                return
+
+        # Create the genesis block
+        print('mining first block')
+        self.chain = []
+        self.new_block()
+
+
+def verify_pvt_key(inp):
     """
-    Creates a SHA-256 hash of a input dictionary
+    Check input pvt key is a valid format toychain pvt key
 
-    :param inp: a dict, such as block, tx
+    :param inp: str,
+    :return: bool
     """
-    s = json.dumps(inp, sort_keys=True).encode()
-    return hashlib.sha256(s).hexdigest()
-
-
-def get_nonce(header, target):
-    while True:
-        header = dict(header)
-        nonce = randint(0, 10000)  # TODO reset max range
-        header['nonce'] = nonce
-        header_string = json.dumps(header, sort_keys=True).encode()
-        hash = hashlib.sha256(header_string).hexdigest()
-        if hash < target:
-            return nonce
-        time.sleep(1)  # 1 second
-
-
-def _get(**kwargs):
-    try:
-        r = requests.get(**kwargs, timeout=5)
-        if r.status_code == 200:
-            return True, r.json()
-    except requests.exceptions.ConnectTimeout as e:
-        print(e)
-    except requests.exceptions.ConnectionError as e:
-        print(e)
-    except requests.exceptions.ReadTimeout as e:
-        print(e)
-    return False, None
-
-
-def _post(**kwargs):
-    try:
-        r = requests.post(**kwargs, timeout=5)
-        if r.status_code == 200:
-            return True, r.json()
-    except requests.exceptions.ConnectTimeout as e:
-        print(e)
-    except requests.exceptions.ConnectionError as e:
-        print(e)
-    except requests.exceptions.ReadTimeout as e:
-        print(e)
-    return False, None
-
-
-def get_chain_from_node(nodes, pub_key):
-    if nodes:
-        chain = []
-        height = 1
-        node = nodes[0]
-        while True:
-            ret, data = _get(url=f'http://{node}/get_block/{height}')
-            if ret and data['ok']:
-                chain.append(data['block'])
-                height += 1
-            else:
-                break
-        if chain:
-            return chain
-
-    # Create the genesis block
-    print('mining first block')
-    block = genesis_block(pub_key)
-    return [block]
-
-
-def get_nodes():
-    nodes = set()
-    for node in config.DEFAULT_NODES:
-        ret, data = _post(url=f'http://{node}/add_node')
-        if ret and data['ok']:
-            nodes.add(node)
-    return list(nodes)
+    pass
 
 
 def verify_chain(chain):
@@ -163,37 +142,3 @@ def post_data(nodes, type, data):
     postfix = f'/add_{type}'
     for node in nodes:
         r = requests.post(url, data)
-
-
-def genesis_block(pub_key):
-    """
-    Generate genesis block
-
-    :param pub_key: a address to receive coinbase reward
-    :return: a dict of genesis block data
-    """
-    header = {
-        'idx': 1,
-        'ts': time.time(),
-        'prev_hash': '',
-    }
-    coinbase_tx = new_tx('0', pub_key, 50)
-    txs = [coinbase_tx]
-
-    block = dict(header)
-    target = config.TARGET
-    nonce = get_nonce(header, target)  # use default target
-    block['nonce'] = nonce
-    block['tx'] = txs
-    block['hash'] = ''  # TODO caculate block hash
-    return block
-
-
-def new_tx(sender, recipient, amount):
-    tx = {
-        'sender': sender,
-        'recipient': recipient,
-        'amount': amount,
-        'ts': time.time(),
-    }
-    return tx
