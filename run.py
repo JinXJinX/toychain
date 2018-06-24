@@ -1,15 +1,22 @@
 # coding=utf-8
 from argparse import ArgumentParser
 
-from server import app
-import config
+import server
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('-p', '--port', default=5000, type=int,
-                        help='port to listen on')
+    parser.add_argument('-c', '--config', default='config', type=str,
+                        help='config file name')
     args = parser.parse_args()
-    port = args.port
+    config_filename = args.config
 
-    app.run(host='127.0.0.1', port=port, debug=True, use_reloader=False)
+    app = server.app
+    app.config.from_object(config_filename)
+    server.init()
+
+    app.run(
+        host=app.config['HOST'],
+        port=app.config['PORT'],
+        use_reloader=app.config['USE_RELOADER']
+    )

@@ -6,7 +6,7 @@ from Crypto.Random.random import randint
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256, RIPEMD
 import requests
-import config
+import settings
 
 
 def new_rsa_key():
@@ -30,7 +30,7 @@ def get_nonce(header):
     target = header['target']
     while True:
         header = dict(header)
-        nonce = randint(0, config.max_nonce)
+        nonce = randint(0, settings.max_nonce)
         header['nonce'] = nonce
         hash = get_hash(header)
         if hash < target:
@@ -38,10 +38,15 @@ def get_nonce(header):
         time.sleep(1)  # 1 second
 
 
-def get_nodes():
+def get_nodes(port):
     nodes = set()
-    for node in config.DEFAULT_NODES:
-        ret, data = _post(url=f'http://{node}/add_node')
+    data = {
+        'node': {
+            'port': port,
+        }
+    }
+    for node in settings.DEFAULT_NODES:
+        ret, data = _post(url=f'http://{node}/add_node', json=data)
         if ret and data['ok']:
             nodes.add(node)
     return list(nodes)
@@ -90,5 +95,7 @@ def _post(**kwargs):
     except requests.exceptions.ConnectionError as e:
         print(e)
     except requests.exceptions.ReadTimeout as e:
+        print(e)
+    except requests.exceptions.InvalidURL as e:
         print(e)
     return False, None

@@ -1,19 +1,27 @@
 # coding=utf-8
-import json
 from urllib.parse import urlparse
 
 
 from flask import Flask, jsonify, request
 import toychain
 from miner import Miner
-import config
+import settings
 
 app = Flask(__name__)
-tc = toychain.ToyChain()
-miner = Miner(tc)
 
-if config.MINING:
-    miner.start()
+tc = None
+miner = None
+
+
+def init():
+    global tc
+    global miner
+
+    tc = toychain.ToyChain(app.config['PORT'])
+
+    if app.config['MINING']:
+        miner = Miner(tc)
+        miner.start()
 
 
 @app.route('/add_node', methods=['POST'])
@@ -22,10 +30,15 @@ def add_node():
     Receive new node, add it to register node list, and broadcast it
     """
     ip = request.remote_addr
-    port = request.environ.get('REMOTE_PORT')
-    if ip not in tc.get_nodes():
+    data = request.get_json() or {}
+    port = data.get('node', {}).get('port')
+    if not port:
+        return jsonify({'ok': False}), 200
+
+    node = f'{ip}:{port}'
+    if node not in tc.get_nodes():
         # TODO broadcast to other node
-        tc.add_node(f'{ip}:{port}')
+        tc.add_node(node)
         return jsonify({'ok': True}), 200
     return jsonify({'ok': False}), 200
 
@@ -35,8 +48,8 @@ def add_tx():
     """
     Receive new tx, verify it then broadcast it
     """
-    data = request.get_json()
-    tx = json.loads(data.get('tx'))
+    data = request.get_json() or {}
+    tx = data.get('tx')
     pass
 
 
@@ -45,8 +58,11 @@ def add_block():
     """
     Receive new block, verify it then add it to chain and broadcast it
     """
-    data = request.get_json()
-    block = json.loads(data.get('block'))
+    data = request.get_json() or {}
+    block = data.get('block')
+    if not block:
+        return jsonify({'ok': False}), 200
+
     tc.add_block(block)
     # TODO if mining, stop the mining thread
     return jsonify({'ok': True}), 200
@@ -64,6 +80,9 @@ def get_block(height):
         'ok': True,
         'block': chain[height]
     }
+    for i, x in enumerate(chain):
+        print(i)
+        print(x)
     return jsonify(response), 200
 
 
@@ -76,7 +95,7 @@ def get_last_block():
     response = {
         'ok': True,
         'block': chain[-1],
-        'height': len(chain),
+        'height': len(chain)-1,
     }
     return jsonify(response), 200
 
@@ -98,4 +117,20 @@ def ping():
     """
     ping
     """
+    return jsonify({'ok': True}), 200
+
+
+# WARNING this url for test only
+@app.route('/send_coin', methods=['POST'])
+def send_coin():
+    """
+
+    """
+    data = request.get_json() or {}
+    address = data.get('address')
+    amount = data.get('amount')
+    fee = data.get('fee')
+    if None in (address, amount, fee):
+        return jsonify({'ok': False}), 200
+    tc.send_coin(address, amount, fee)
     return jsonify({'ok': True}), 200

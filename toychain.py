@@ -3,20 +3,21 @@ import time
 
 from Crypto.PublicKey import RSA
 import requests
-import config
+import settings
 import utils
 
 
 class ToyChain:
-    def __init__(self, pvt_key=None, version=config.VERSION):
+    def __init__(self, port, pvt_key=None, version=settings.VERSION):
         # TODO use private variables
         self.tx_pool = []
         # self.chain = []
         self.version = version
-        self.nodes = utils.get_nodes()
+        self.port = port
+        self.nodes = utils.get_nodes(port)
 
         self.pvt_key = pvt_key or utils.new_rsa_key()
-        self.pub_key = self.pvt_key.exportKey().decode()
+        self.pub_key = self.pvt_key.publickey().exportKey().decode()
         self.address = utils.pub_2_address(self.pub_key)
 
         self.init_chain()
@@ -34,9 +35,10 @@ class ToyChain:
         # TODO does the coinbase tx affects merkle root?
         # TODO lock thead
         coinbase_tx = self.new_tx('0', self.address, 50, 0)
-        txs = [coinbase_tx] + self.tx_pool
+        tx_pool = self.tx_pool
+        txs = [coinbase_tx] + [tx_pool.pop(0) for _ in range(len(tx_pool))]
         # Reset the current list of transactions
-        self.tx_pool = []
+        # self.tx_pool = []
         # TODO unlock thead
 
         block = dict(header)
@@ -44,15 +46,17 @@ class ToyChain:
         block['nonce'] = nonce
         block['hash'] = utils.get_hash(block)
         block['tx'] = txs
+        block['confirmation'] = 1
         chain.append(block)
         self.broadcast('block', block)
 
-    def send_coin(to_address, amount, fee):
+    def send_coin(self, to_address, amount, fee):
         tx = self.new_tx(self.address, to_address, amount, fee)
         tx['hash'] = utils.get_hash(tx)
-        tx['signature'] = self.pvt_key.sign(tx['hash'], '')
+        tx['signature'] = str(self.pvt_key.sign(tx['hash'].encode(), '')[0])
         tx['pub_key'] = self.pub_key
         tx['confirmation'] = 1
+        self.tx_pool.append(tx)
         # TODO boradcast tx
         self.broadcast('tx', tx)
 
@@ -68,7 +72,7 @@ class ToyChain:
 
     def get_target(self):
         # TODO adjust target based on previous blocks' mining time
-        return config.TARGET
+        return settings.TARGET
 
     def init_chain(self):
         if self.nodes:
@@ -82,7 +86,6 @@ class ToyChain:
                     height += 1
                 else:
                     break
-            print(chain)
             if chain:
                 self.chain = chain
                 return
@@ -93,9 +96,10 @@ class ToyChain:
         self.new_block()
 
     def broadcast(self, type, data):
+        data = {type: data}
         for node in list(self.nodes):
             url = f'http://{node}/add_{type}'
-            ret, data = utils._post(url=url, data=utils.get_hash(data))
+            ret, data = utils._post(url=url, json=data)
             print(ret, data)
             if not ret:
                 self.nodes.remove(node)
@@ -111,7 +115,7 @@ class ToyChain:
                 b['confirmation'] += 1
                 return
         self.chain.append(block)
-        broadcast('block', block)
+        self.broadcast('block', block)
         return
 
     def get_nodes(self):
@@ -119,6 +123,9 @@ class ToyChain:
 
     def get_chain(self):
         return list(self.chain)
+
+    def get_tx_pool(self):
+        return list(self.tx_pool)
 
 
 def resolve_conflicts():

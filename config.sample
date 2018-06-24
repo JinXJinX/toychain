@@ -5,5 +5,5 @@ DEBUG = True
 HOST = '0.0.0.0'
 USE_RELOADER = False
 
-PORT = 5000
-MINING = True
+PORT = 3000
+MINING = False
