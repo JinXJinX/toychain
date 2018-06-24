@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 
 from server import app
+import config
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 # coding=utf-8
 import time
 
+from Crypto.PublicKey import RSA
 import requests
 import config
 import utils
@@ -10,14 +11,15 @@ class ToyChain:
     def __init__(self, pvt_key=None, version=config.VERSION):
         # TODO use private variables
         self.tx_pool = []
+        # self.chain = []
         self.version = version
         self.nodes = utils.get_nodes()
 
-        self.pvt_key = pvt_key or utils.new_pvt_key()
-        self.pub_key = utils.pvt_2_pub_key(self.pvt_key)
+        self.pvt_key = pvt_key or utils.new_rsa_key()
+        self.pub_key = self.pvt_key.exportKey().decode()
         self.address = utils.pub_2_address(self.pub_key)
 
-        self.get_chain()
+        self.init_chain()
 
     def new_block(self):
         chain = self.chain
@@ -31,7 +33,7 @@ class ToyChain:
         }
         # TODO does the coinbase tx affects merkle root?
         # TODO lock thead
-        coinbase_tx = new_tx('0', self.pub_key, 50)
+        coinbase_tx = self.new_tx('0', self.address, 50, 0)
         txs = [coinbase_tx] + self.tx_pool
         # Reset the current list of transactions
         self.tx_pool = []
@@ -40,43 +42,47 @@ class ToyChain:
         block = dict(header)
         nonce = utils.get_nonce(header)
         block['nonce'] = nonce
-        block['hash'] = utils.hash(block)
+        block['hash'] = utils.get_hash(block)
         block['tx'] = txs
         chain.append(block)
+        self.broadcast('block', block)
 
-    def new_tx(self, to_address, amount, fee, signature):
+    def send_coin(to_address, amount, fee):
+        tx = self.new_tx(self.address, to_address, amount, fee)
+        tx['hash'] = utils.get_hash(tx)
+        tx['signature'] = self.pvt_key.sign(tx['hash'], '')
+        tx['pub_key'] = self.pub_key
+        tx['confirmation'] = 1
+        # TODO boradcast tx
+        self.broadcast('tx', tx)
+
+    def new_tx(self, from_address, to_address, amount, fee):
         tx = {
-            'from': self.address,
+            'from': from_address,
             'to': to_address,
             'total_input': amount + fee,
             'total_output': amount,
-            'signature': self._get_signature(),
             'ts': time.time(),
         }
-        tx['hash'] = utils.hash(tx)
-        # TODO verify tx
-        tx['confirmation'] = 1
         return tx
-
-    def _get_signature(self):
-        pass
 
     def get_target(self):
         # TODO adjust target based on previous blocks' mining time
         return config.TARGET
 
-    def get_chain(self):
+    def init_chain(self):
         if self.nodes:
             chain = []
             height = 0
             node = self.nodes[0]
             while True:
-                ret, data = _get(url=f'http://{node}/get_block/{height}')
+                ret, data = utils._get(url=f'http://{node}/get_block/{height}')
                 if ret and data['ok']:
                     chain.append(data['block'])
                     height += 1
                 else:
                     break
+            print(chain)
             if chain:
                 self.chain = chain
                 return
@@ -86,45 +92,33 @@ class ToyChain:
         self.chain = []
         self.new_block()
 
+    def broadcast(self, type, data):
+        for node in list(self.nodes):
+            url = f'http://{node}/add_{type}'
+            ret, data = utils._post(url=url, data=utils.get_hash(data))
+            print(ret, data)
+            if not ret:
+                self.nodes.remove(node)
 
-def verify_pvt_key(inp):
-    """
-    Check input pvt key is a valid format toychain pvt key
+    def add_node(self, node):
+        self.nodes.append(node)
 
-    :param inp: str,
-    :return: bool
-    """
-    pass
+    def add_block(self, block):
+        print(block)
+        # TODO verify block
+        for b in self.chain:
+            if b['hash'] == block['hash']:
+                b['confirmation'] += 1
+                return
+        self.chain.append(block)
+        broadcast('block', block)
+        return
 
+    def get_nodes(self):
+        return list(self.nodes)
 
-def verify_chain(chain):
-    """
-    Check required fields, and caculate whole chain from height 1
-
-    :param chain: list of block data
-    :return: bool
-    """
-    pass
-
-
-def verify_tx(tx):
-    """
-    Check required fields, and verify account money and signature
-
-    :param tx: dict, tx data
-    :return: bool
-    """
-    pass
-
-
-def verify_block(block):
-    """
-    Check required fields, and verify hash, nonce, and target
-
-    :param block: dict, block data
-    :return: bool
-    """
-    pass
+    def get_chain(self):
+        return list(self.chain)
 
 
 def resolve_conflicts():

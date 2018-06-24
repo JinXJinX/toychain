@@ -1,43 +1,38 @@
 # coding=utf-8
 import time
 import json
-import hashlib
-import uuid
-from random import randint
 
+from Crypto.Random.random import randint
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256, RIPEMD
 import requests
 import config
 
 
-def new_pvt_key():
-    return str(uuid.uuid4()).replace('-', '')
+def new_rsa_key():
+    # generate 2048bits long key
+    return RSA.generate(2048)
 
 
-def pvt_2_pub_key(pub_key):
-    ecdsa = hashlib.new('ecdsa-with-SHA1')
-    ecdsa.update(str.encode(pub_key))
-    return ecdsa.hexdigest()
-
-
-def hash(inp):
+def get_hash(inp):
     """
     Creates a SHA-256 hash of a input dictionary
 
     :param inp: dict, such as block, tx
     """
-    s = json.dumps(inp, sort_keys=True).encode()
-    return hashlib.sha256(s).hexdigest()
+    b = json.dumps(inp, sort_keys=True).encode()
+    h = SHA256.new()
+    h.update(b)
+    return h.hexdigest()
 
 
 def get_nonce(header):
     target = header['target']
-    max_nonce = 2 ** 32
     while True:
         header = dict(header)
-        nonce = randint(0, max_nonce)  # TODO reset max range
+        nonce = randint(0, config.max_nonce)
         header['nonce'] = nonce
-        header_string = json.dumps(header, sort_keys=True).encode()
-        hash = hashlib.sha256(header_string).hexdigest()
+        hash = get_hash(header)
         if hash < target:
             return nonce
         time.sleep(1)  # 1 second
@@ -59,12 +54,12 @@ def pub_2_address(pub_key):
     :param pub_key:
     :return: str, address
     """
-    ripemd = hashlib.new('ripemd160')
-    sha = hashlib.sha256(pub_key.encode()).hexdigest()
+    ripemd = RIPEMD.new()
+    sha = get_hash(pub_key)
     ripemd.update(sha.encode())
     pub_key_hash = ripemd.hexdigest()
     # TODO base58 encoding
-    return ripemd.hexdigest()
+    return pub_key_hash
 
 
 def base58(inp):

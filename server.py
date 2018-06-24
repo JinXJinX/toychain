@@ -23,9 +23,9 @@ def add_node():
     """
     ip = request.remote_addr
     port = request.environ.get('REMOTE_PORT')
-    if ip not in tc.nodes:
+    if ip not in tc.get_nodes():
         # TODO broadcast to other node
-        tc.nodes.append(f'{ip}:{port}')
+        tc.add_node(f'{ip}:{port}')
         return jsonify({'ok': True}), 200
     return jsonify({'ok': False}), 200
 
@@ -46,9 +46,10 @@ def add_block():
     Receive new block, verify it then add it to chain and broadcast it
     """
     data = request.get_json()
-    tx = json.loads(data.get('block'))
+    block = json.loads(data.get('block'))
+    tc.add_block(block)
     # TODO if mining, stop the mining thread
-    pass
+    return jsonify({'ok': True}), 200
 
 
 @app.route('/get_block/<int:height>', methods=['GET'])
@@ -56,11 +57,12 @@ def get_block(height):
     """
     Get block by height/idx
     """
-    if height >= len(tc.chain):
+    chain = tc.get_chain()
+    if height >= len(chain):
         return jsonify({'ok': False}), 200
     response = {
-        "ok": True,
-        "block": tc.chain[height]
+        'ok': True,
+        'block': chain[height]
     }
     return jsonify(response), 200
 
@@ -70,9 +72,11 @@ def get_last_block():
     """
     Get the lastest block in the chain
     """
+    chain = tc.get_chain()
     response = {
-        "ok": True,
-        "block": tc.chain[-1]
+        'ok': True,
+        'block': chain[-1],
+        'height': len(chain),
     }
     return jsonify(response), 200
 
@@ -83,8 +87,8 @@ def get_node():
     Get a list of registered nodes
     """
     response = {
-        "ok": True,
-        "nodes": tc.nodes
+        'ok': True,
+        'nodes': tc.get_nodes()
     }
     return jsonify(response), 200
 
