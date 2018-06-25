@@ -46,8 +46,8 @@ def get_nodes(port):
         }
     }
     for node in settings.DEFAULT_NODES:
-        ret, data = _post(url=f'http://{node}/add_node', json=data)
-        if ret and data['ok']:
+        ret, info = _post(url=f'http://{node}/add_node', json=data)
+        if ret and info['ok']:
             nodes.add(node)
     return list(nodes)
 

@@ -36,11 +36,8 @@ def add_node():
         return jsonify({'ok': False}), 200
 
     node = f'{ip}:{port}'
-    if node not in tc.get_nodes():
-        # TODO broadcast to other node
-        tc.add_node(node)
-        return jsonify({'ok': True}), 200
-    return jsonify({'ok': False}), 200
+    rst = tc.add_node(node)
+    return jsonify({'ok': rst}), 200
 
 
 @app.route('/add_tx', methods=['POST'])
@@ -50,7 +47,8 @@ def add_tx():
     """
     data = request.get_json() or {}
     tx = data.get('tx')
-    pass
+    rst = tc.add_tx(tx)
+    return jsonify({'ok': rst}), 200
 
 
 @app.route('/add_block', methods=['POST'])
@@ -63,9 +61,9 @@ def add_block():
     if not block:
         return jsonify({'ok': False}), 200
 
-    tc.add_block(block)
+    rst = tc.add_block(block)
     # TODO if mining, stop the mining thread
-    return jsonify({'ok': True}), 200
+    return jsonify({'ok': rst}), 200
 
 
 @app.route('/get_block/<int:height>', methods=['GET'])
@@ -80,9 +78,6 @@ def get_block(height):
         'ok': True,
         'block': chain[height]
     }
-    for i, x in enumerate(chain):
-        print(i)
-        print(x)
     return jsonify(response), 200
 
 

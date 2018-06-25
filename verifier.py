@@ -3,6 +3,13 @@
 import utils
 from Crypto.PublicKey import RSA
 
+# sorted tx keys
+tx_keys = ['confirmation', 'from', 'hash', 'pub_key', 'signature', 'to',
+           'total_input', 'total_output', 'ts']
+# sorted tx keys
+block_keys = ['confirmation', 'hash', 'nonce', 'prev_hash', 'target', 'ts',
+              'tx', 'version']
+
 
 def pvt_key(inp):
     """
@@ -12,22 +19,6 @@ def pvt_key(inp):
     :return: bool
     """
     pass
-
-
-def sign(pub_key, tx, signature):
-    """
-
-    :param pub_key: b,
-    :param msg: b,
-    :param signature: int,
-    :return: bool
-    """
-    key = RSA.importKey(pub_key.encode())
-    tx2 = {}
-    for k in ['from', 'to', 'total_input', 'total_output', 'ts']:
-        tx2[k] = tx[k]
-    tx_hash = utils.get_hash(tx2)
-    return key.verify(tx_hash.encode(), (signature, None))
 
 
 def chain(chain):
@@ -47,7 +38,35 @@ def tx(tx):
     :param tx: dict, tx data
     :return: bool
     """
-    pass
+    if sorted(tx.keys()) != tx_keys:
+        return False
+
+    tx2 = {}
+    for key in ['from', 'to', 'total_input', 'total_output', 'ts']:
+        tx2[key] = tx[key]
+    tx2_hash = utils.get_hash(tx2)
+
+    if tx2_hash != tx['hash']:
+        return False
+
+    # TODO check the 'from' address has enough money
+
+    if not sign(tx['pub_key'], tx['hash'], int(tx['signature'])):
+        return False
+
+    return True
+
+
+def sign(pub_key, tx_hash, signature):
+    """
+
+    :param pub_key: b,
+    :param msg: b,
+    :param signature: int,
+    :return: bool
+    """
+    key = RSA.importKey(pub_key.encode())
+    return key.verify(tx_hash.encode(), (signature, None))
 
 
 def block(block):
@@ -57,4 +76,19 @@ def block(block):
     :param block: dict, block data
     :return: bool
     """
-    pass
+    if sorted(block.keys()) != block_keys:
+        return False
+
+    block2 = {}
+    for key in ['version', 'ts', 'prev_hash', 'nonce', 'target']:
+        block2[key] = block[key]
+    block2_hash = utils.get_hash(block2)
+
+    if block2_hash != block['hash']:
+        return False
+
+    # TODO verify 'target' is correct
+    if block2_hash >= block['target']:
+        return False
+
+    return True
