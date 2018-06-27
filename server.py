@@ -17,8 +17,15 @@ def init():
     global tc
     global miner
 
-    tc = toychain.ToyChain(app.config['PORT'])
+    pvt_key = app.config.get('PVT_KEY')
+    tc = toychain.ToyChain(app.config['PORT'], pvt_key=pvt_key)
 
+    if not pvt_key:
+        filename = app.config['CONFIG_FILENAME']
+        with open(f'{filename}.py', 'a') as f:
+            f.write(f'PVT_KEY = \'\'\'{tc.get_pvt_key()}\'\'\'')
+
+    print(tc.get_address())
     if app.config['MINING']:
         miner = Miner(tc)
         miner.start()
@@ -107,6 +114,18 @@ def get_node():
     return jsonify(response), 200
 
 
+@app.route('/get_ledger', methods=['GET'])
+def get_ledger():
+    """
+    Get a list of ledger
+    """
+    response = {
+        'ok': True,
+        'ledger': tc.get_ledger()
+    }
+    return jsonify(response), 200
+
+
 @app.route('/ping', methods=['GET'])
 def ping():
     """
@@ -127,5 +146,5 @@ def send_coin():
     fee = data.get('fee')
     if None in (address, amount, fee):
         return jsonify({'ok': False}), 200
-    tc.send_coin(address, amount, fee)
-    return jsonify({'ok': True}), 200
+    rst = tc.send_coin(address, amount, fee)
+    return jsonify({'ok': rst}), 200

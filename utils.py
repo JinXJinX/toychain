@@ -9,7 +9,9 @@ import requests
 import settings
 
 
-def new_rsa_key():
+def new_rsa_key(pvt_key):
+    if pvt_key:
+        return RSA.importKey(pvt_key.encode())
     # generate 2048bits long key
     return RSA.generate(2048)
 

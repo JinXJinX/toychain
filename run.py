@@ -13,6 +13,7 @@ if __name__ == '__main__':
 
     app = server.app
     app.config.from_object(config_filename)
+    app.config['CONFIG_FILENAME'] = config_filename
     server.init()
 
     app.run(
