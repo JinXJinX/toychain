@@ -26,6 +26,9 @@ class ToyChain:
             self.init_chain()
 
     def new_block(self):
+        """
+        Mining a new block.
+        """
         chain = self.chain
         header = {
             'version': self.version,
@@ -36,13 +39,14 @@ class ToyChain:
             # TODO merkle root
         }
         # TODO does the coinbase tx affects merkle root?
-        # TODO lock thead
         coinbase_tx = self.new_tx('0', self.address, 50, 0)
         tx_pool = self.tx_pool
+        # use pop keep thread safe
         txs = [coinbase_tx] + [tx_pool.pop(0) for _ in range(len(tx_pool))]
-        # TODO unlock thead
 
         block = dict(header)
+
+        # guess a nonce, this gonna takes timeeeeee
         nonce = utils.get_nonce(header)
         block['nonce'] = nonce
         block['hash'] = utils.get_hash(block)
@@ -57,18 +61,32 @@ class ToyChain:
             return
 
     def send_coin(self, to_address, amount, fee):
+        """
+
+        :param to_address: str, receiver address
+        :param amount: int,
+        :param fee: int, fee paid to miner
+        """
         tx = self.new_tx(self.address, to_address, amount, fee)
         tx['hash'] = utils.get_hash(tx)
         tx['signature'] = str(self.pvt_key.sign(tx['hash'].encode(), '')[0])
         tx['pub_key'] = self.pub_key
         tx['confirmation'] = 1
 
-        # self.tx_pool.append(tx)
         # boradcast tx
         self.broadcast('tx', tx)
+
         return True
 
     def new_tx(self, from_address, to_address, amount, fee):
+        """
+        generate new tx
+
+        :param from_address: str, sender address
+        :param to_address: str, recevier address
+        :param amount: int,
+        :param fee: int, fee paid to miner
+        """
         tx = {
             'from': from_address,
             'to': to_address,
@@ -83,6 +101,12 @@ class ToyChain:
         return settings.TARGET
 
     def update_ledger(self, txs, ledger=None):
+        """
+        update ledger, from a list of txs
+
+        :param txs: list,
+        :param ledger: dict,
+        """
         ledger = ledger or self.ledger
         for tx in txs:
             if tx['from'] != '0':
@@ -95,6 +119,11 @@ class ToyChain:
         return True
 
     def get_chain_from_node(self, node):
+        """
+        get entire chain from a node
+
+        :param node: str,
+        """
         chain = []
         ledger = {}
         height = 0
@@ -113,7 +142,6 @@ class ToyChain:
 
                 chain.append(block)
                 height += 1
-
             else:
                 break
         return chain, ledger
@@ -189,7 +217,6 @@ class ToyChain:
         if not vf.tx(new_tx):
             return False
 
-        # TODO modify amounts' money
         if not self.update_ledger([new_tx]):
             return False
 
