@@ -16,13 +16,13 @@ class ToyChain:
         self.version = version
         self.port = port
         self.nodes = utils.get_nodes(port)
+        self.ledger = {}
 
         self.pvt_key = utils.new_rsa_key(pvt_key)
         self.pub_key = self.pvt_key.publickey().exportKey().decode()
         self.address = utils.pub_2_address(self.pub_key)
 
         if node:
-            self.ledger = {}
             self.init_chain()
 
     def new_block(self):
@@ -63,10 +63,7 @@ class ToyChain:
         tx['pub_key'] = self.pub_key
         tx['confirmation'] = 1
 
-        if not self.update_ledger([tx]):
-            return False
-
-        self.tx_pool.append(tx)
+        # self.tx_pool.append(tx)
         # boradcast tx
         self.broadcast('tx', tx)
         return True
@@ -143,7 +140,7 @@ class ToyChain:
         :param type: str, 'tx', 'block', or 'node'
         :param data: a dict, depends on type,
         """
-        data = {type: data}
+        data = {type: data, 'port': self.port}
         for node in list(self.nodes):
             url = f'http://{node}/add_{type}'
             ret, data = utils._post(url=url, json=data)
@@ -158,8 +155,7 @@ class ToyChain:
         self.nodes.append(node)
         return True
 
-    def add_block(self, new_block):
-        # TODO verify block
+    def add_block(self, new_block, node):
         if not vf.block(new_block):
             return False
 
@@ -167,9 +163,27 @@ class ToyChain:
             if block['hash'] == new_block['hash']:
                 block['confirmation'] += 1
                 return True
-        self.chain.append(new_block)
-        self.broadcast('block', new_block)
-        return True
+
+        if block['prev_hash'] == self.chain[-1]['hash']:
+            self.chain.append(new_block)
+            self.broadcast('block', new_block)
+            return True
+
+        return self.resolve_conflicts(node)
+
+    def resolve_conflicts(self, node):
+        url = f'http://{node}/get_last_block'
+        ret, data = utils._get(url=url)
+        if not ret or not data['ok']:
+            return False
+
+        if data['height'] > len(self.chain):
+            chain, ledger = self.get_chain_from_node(node)
+            if chain:
+                self.chain = chain
+                self.ledger = ledger
+                return True
+        return False
 
     def add_tx(self, new_tx):
         if not vf.tx(new_tx):
@@ -204,7 +218,3 @@ class ToyChain:
 
     def get_ledger(self):
         return dict(self.ledger)
-
-
-def resolve_conflicts():
-    pass

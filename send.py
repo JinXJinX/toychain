@@ -2,9 +2,10 @@
 from argparse import ArgumentParser
 
 import toychain
+import config
 
 
-if __name__ == '__main__':
+def tool_send_coin():
     parser = ArgumentParser()
     parser.add_argument('-to', '--address', type=str, help='send coin to this address')
     parser.add_argument('-a', '--amount', type=int, help='amount of coin')
@@ -14,6 +15,13 @@ if __name__ == '__main__':
     amount = args.amount
     fee = args.fee
 
+    if None in (address, amount, fee):
+        return
+
     # lode config from config file
-    port = "?"
-    tc = toychain.ToyChain(port, pvt_key="", node=False)
+    tc = toychain.ToyChain(config.PORT, pvt_key=config.PVT_KEY, node=False)
+    rst = tc.send_coin(address, amount, fee)
+
+
+if __name__ == '__main__':
+    tool_send_coin()

@@ -63,12 +63,17 @@ def add_block():
     """
     Receive new block, verify it then add it to chain and broadcast it
     """
+    ip = request.remote_addr
+
     data = request.get_json() or {}
     block = data.get('block')
-    if not block:
+    port = data.get('port')
+
+    if not block or not port:
         return jsonify({'ok': False}), 200
 
-    rst = tc.add_block(block)
+    node = f'{ip}:{port}'
+    rst = tc.add_block(block, node)
     # TODO if mining, stop the mining thread
     return jsonify({'ok': rst}), 200
 
@@ -135,16 +140,16 @@ def ping():
 
 
 # WARNING this url for test only
-@app.route('/send_coin', methods=['POST'])
-def send_coin():
-    """
-
-    """
-    data = request.get_json() or {}
-    address = data.get('address')
-    amount = data.get('amount')
-    fee = data.get('fee')
-    if None in (address, amount, fee):
-        return jsonify({'ok': False}), 200
-    rst = tc.send_coin(address, amount, fee)
-    return jsonify({'ok': rst}), 200
+# @app.route('/send_coin', methods=['POST'])
+# def send_coin():
+#     """
+#
+#     """
+#     data = request.get_json() or {}
+#     address = data.get('address')
+#     amount = data.get('amount')
+#     fee = data.get('fee')
+#     if None in (address, amount, fee):
+#         return jsonify({'ok': False}), 200
+#     rst = tc.send_coin(address, amount, fee)
+#     return jsonify({'ok': rst}), 200
