@@ -79,11 +79,14 @@ def _get(**kwargs):
         if r.status_code == 200:
             return True, r.json()
     except requests.exceptions.ConnectTimeout as e:
-        print(e)
+        # print(e)
+        pass
     except requests.exceptions.ConnectionError as e:
-        print(e)
+        # print(e)
+        pass
     except requests.exceptions.ReadTimeout as e:
-        print(e)
+        # print(e)
+        pass
     return False, None
 
 
@@ -93,11 +96,15 @@ def _post(**kwargs):
         if r.status_code == 200:
             return True, r.json()
     except requests.exceptions.ConnectTimeout as e:
-        print(e)
+        # print(e)
+        pass
     except requests.exceptions.ConnectionError as e:
-        print(e)
+        # print(e)
+        pass
     except requests.exceptions.ReadTimeout as e:
-        print(e)
+        # print(e)
+        pass
     except requests.exceptions.InvalidURL as e:
-        print(e)
+        # print(e)
+        pass
     return False, None

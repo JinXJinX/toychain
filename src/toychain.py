@@ -21,6 +21,7 @@ class ToyChain:
         self.pvt_key = utils.new_rsa_key(pvt_key)
         self.pub_key = self.pvt_key.publickey().exportKey().decode()
         self.address = utils.pub_2_address(self.pub_key)
+        self.lock = False
 
         if node:
             self.init_chain()
@@ -46,7 +47,7 @@ class ToyChain:
 
         block = dict(header)
 
-        # guess a nonce, this gonna takes timeeeeee
+        # guess a nonce, this gonna takes ttttttttime
         nonce = utils.get_nonce(header)
         block['nonce'] = nonce
         block['hash'] = utils.get_hash(block)
@@ -58,7 +59,7 @@ class ToyChain:
         # update coinbase reward on ledger after fount the block
         if not self.update_ledger([coinbase_tx]):
             print('update ledger error???')
-            return
+            # TODO del this block
 
     def send_coin(self, to_address, amount, fee):
         """
@@ -86,6 +87,7 @@ class ToyChain:
         :param to_address: str, recevier address
         :param amount: int,
         :param fee: int, fee paid to miner
+        :return: dict
         """
         tx = {
             'from': from_address,
@@ -97,6 +99,11 @@ class ToyChain:
         return tx
 
     def get_target(self):
+        """
+        get target hash for mining.
+
+        :return: str
+        """
         # TODO adjust target based on previous blocks' mining time
         return settings.TARGET
 
@@ -106,6 +113,7 @@ class ToyChain:
 
         :param txs: list,
         :param ledger: dict,
+        :return: bool
         """
         ledger = ledger or self.ledger
         for tx in txs:
@@ -118,32 +126,57 @@ class ToyChain:
 
         return True
 
-    def get_chain_from_node(self, node):
+    def get_chain_from_node(self, node, entire_chain=True):
         """
         get entire chain from a node
 
         :param node: str,
+        :param ledger: dict,
         """
         chain = []
         ledger = {}
-        height = 0
-        while True:
+        block_headers = None
+
+        if not entire_chain:
+            block_headers = {block['hash']: idx for idx, block in enumerate(self.chain)}
+
+        ret, data = utils._get(url=f'http://{node}/get_last_block')
+        if not (ret and data['ok']):
+            return [], {}
+
+        height = data.get('height', -1)
+        print(height)
+
+        while height > -1:
             ret, data = utils._get(url=f'http://{node}/get_block/{height}')
+            print(ret)
             if ret and data['ok']:
                 block = data.get('block', {})
+                print(f'verify chain: {vf.block(block)}')
                 if not vf.block(block):
                     break
-                if chain and chain[-1]['hash'] != block['prev_hash']:
+
+                if chain and chain[0]['prev_hash'] != block['hash']:
                     break
 
-                # update ledger
-                if not self.update_ledger(block['tx'], ledger):
+                print(f'entire chain: {entire_chain}')
+                if not entire_chain and block['hash'] in block_headers.keys():
+                    idx = block_headers.get(block['hash'])
+                    chain = self.chain[:idx+1] + chain
                     break
 
-                chain.append(block)
-                height += 1
+                chain.insert(0, block)
+                height -= 1
             else:
-                break
+                return [], {}
+
+        # update ledger
+        txs = []
+        for block in chain:
+            txs.extend(block['tx'])
+        if not self.update_ledger(txs, ledger):
+            return [], {}
+
         return chain, ledger
 
     def init_chain(self):
@@ -176,6 +209,12 @@ class ToyChain:
                 self.nodes.remove(node)
 
     def add_node(self, node):
+        """
+        Add a node to node list
+
+        :param node: str, like 1.1.1.1:5000
+        :return: bool
+        """
         if node in self.chain:
             return True
 
@@ -184,6 +223,15 @@ class ToyChain:
         return True
 
     def add_block(self, new_block, node):
+        """
+        Add a block to local chain
+
+        :param new_block: dict,
+        :return: bool
+        """
+        if self.lock:
+            return False
+
         if not vf.block(new_block):
             return False
 
@@ -192,7 +240,7 @@ class ToyChain:
                 block['confirmation'] += 1
                 return True
 
-        if block['prev_hash'] == self.chain[-1]['hash']:
+        if new_block['prev_hash'] == self.chain[-1]['hash']:
             self.chain.append(new_block)
             self.broadcast('block', new_block)
             return True
@@ -200,17 +248,22 @@ class ToyChain:
         return self.resolve_conflicts(node)
 
     def resolve_conflicts(self, node):
+        self.lock = True
         url = f'http://{node}/get_last_block'
         ret, data = utils._get(url=url)
         if not ret or not data['ok']:
+            self.lock = False
             return False
 
         if data['height'] > len(self.chain):
-            chain, ledger = self.get_chain_from_node(node)
+            chain, ledger = self.get_chain_from_node(node, entire_chain=False)
             if chain:
                 self.chain = chain
                 self.ledger = ledger
+                self.lock = False
                 return True
+
+        self.lock = False
         return False
 
     def add_tx(self, new_tx):
