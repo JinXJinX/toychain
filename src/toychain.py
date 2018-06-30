@@ -21,7 +21,6 @@ class ToyChain:
         self.pvt_key = utils.new_rsa_key(pvt_key)
         self.pub_key = self.pvt_key.publickey().exportKey().decode()
         self.address = utils.pub_2_address(self.pub_key)
-        self.lock = False
 
         if node:
             self.init_chain()
@@ -229,9 +228,6 @@ class ToyChain:
         :param new_block: dict,
         :return: bool
         """
-        if self.lock:
-            return False
-
         if not vf.block(new_block):
             return False
 
@@ -248,11 +244,9 @@ class ToyChain:
         return self.resolve_conflicts(node)
 
     def resolve_conflicts(self, node):
-        self.lock = True
         url = f'http://{node}/get_last_block'
         ret, data = utils._get(url=url)
         if not ret or not data['ok']:
-            self.lock = False
             return False
 
         if data['height'] > len(self.chain):
@@ -260,10 +254,8 @@ class ToyChain:
             if chain:
                 self.chain = chain
                 self.ledger = ledger
-                self.lock = False
                 return True
 
-        self.lock = False
         return False
 
     def add_tx(self, new_tx):
