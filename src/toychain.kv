@@ -1,0 +1,103 @@
+<TCLabelBox@BoxLayout>:
+    orientation: 'horizontal'
+    size_hint: 1.0, 0.25
+
+<TCLabel@Label>:
+    markup: True
+    size_hint: 0.3, 1.0
+
+<TCText@Label>:
+    markup: True
+    size_hint: 1.0, 1.0
+
+<TCBtn@Button>:
+    markup: True
+    size_hint: 1.0, 1.0
+    background_color: 0.5, 0.2, 0.6, 1
+
+<TCInput@TextInput>:
+    markup: True
+    border: 2, 4, 4, 4
+
+<MenuScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 1, 50, 1, 0
+        canvas.before:
+            Color:
+                rgba: 246, 246, 246, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        TCLabelBox:
+            TCLabel:
+                text: '[b][color=000]Address[/color][/b]'
+            TCText:
+                id: address
+                text: '[b][color=000]8982d848fd8aa0df8cc257682ffb31a7652fc410[/color][/b]'
+        TCLabelBox:
+            TCLabel:
+                text: '[b][color=000]Balance[/color][/b]'
+            TCText:
+                id: balance
+                text: '[b][color=000]200[/color][/b]'
+        TCLabelBox:
+            TCLabel:
+                text: '[b][color=000]Mining[/color][/b]'
+            TCBtn:
+                text: 'Start'
+        TCLabelBox:
+            TCBtn:
+                text: 'Send Coin'
+                on_press:
+                    root.manager.transition.direction = 'left'
+                    root.manager.current = 'transfer'
+
+<TransferScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 1, 50, 1, 0
+        canvas.before:
+            Color:
+                rgba: 246, 246, 246, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        TCLabelBox:
+            TCLabel:
+                text: '[b][color=000]To Address[/color][/b]'
+            TCInput:
+                id: to_address
+        TCLabelBox:
+            TCLabel:
+                text: '[b][color=000]Amount[/color][/b]'
+            TCInput:
+                id: amount
+        TCLabelBox:
+            TCLabel:
+                text: '[b][color=000]Fee[/color][/b]'
+            TCInput:
+                id: fee
+        TCLabelBox:
+            TCBtn:
+                text: 'Back'
+                on_press:
+                    root.manager.transition.direction = 'right'
+                    root.manager.current = 'menu'
+            TCBtn:
+                text: 'Send'
+                on_press:
+                    root.manager.transition.direction = 'left'
+                    root.manager.current = 'info'
+
+<InfoScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        TCLabel:
+            text: '[b][color=fff]Good! OK![/color][/b]'
+        TCLabelBox:
+            TCBtn:
+                text: 'Done'
+                on_press:
+                    root.manager.transition.direction = 'left'
+                    root.manager.current = 'menu'
