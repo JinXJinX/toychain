@@ -137,19 +137,3 @@ def ping():
     ping
     """
     return jsonify({'ok': True}), 200
-
-
-# WARNING this url for test only
-# @app.route('/send_coin', methods=['POST'])
-# def send_coin():
-#     """
-#
-#     """
-#     data = request.get_json() or {}
-#     address = data.get('address')
-#     amount = data.get('amount')
-#     fee = data.get('fee')
-#     if None in (address, amount, fee):
-#         return jsonify({'ok': False}), 200
-#     rst = tc.send_coin(address, amount, fee)
-#     return jsonify({'ok': rst}), 200
